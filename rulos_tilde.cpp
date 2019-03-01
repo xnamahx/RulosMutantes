@@ -208,16 +208,28 @@ void rulos_freqin(t_rulos *x, double f)
 
 void rulos_note(t_rulos *x, double f)
 {
-	x->f_note = constrain(f, 0.f, 8.f) / 8.f;
-	x->patch.note = ((x->f_note * 10.f) - 3.f) * 12.f;
+	x->f_note = f + 24.f;
+	x->patch.note = x->f_note;
+	//x->f_note = constrain(f, 0.f, 8.f) / 8.f;
+	//x->patch.note = 24.f + (x->f_note * 7.f) * 12.f;
+	//x->modulations.note = 24.f + (x->f_note * 7.f) * 12.f;
+
+	/*object_post(&x->x_obj, "rulos_note");
+	std::string s = std::to_string(x->patch.note);
+	object_post(&x->x_obj, s.c_str());*/
+
 	//x->modulations.note = ((x->f_note * 10.f) - 3.f) * 12.f;
 }
 
 
 void rulos_freq(t_rulos *x, double f)
 {
-  	x->f_freq = constrain(f, -4.f, 4.f);
-	x->patch.note = 60.f + x->f_freq * 12.f;
+  	x->f_freq = f + 24.f;/*constrain(f, -3.f, 4.f);*/
+	x->patch.note = x->f_freq;/*60.f + x->f_freq * 12.f;*/
+
+	/*object_post(&x->x_obj, "rulos_freq");
+	std::string s = std::to_string(x->patch.note);
+	object_post(&x->x_obj, s.c_str());*/
 }
 
 void rulos_model2(t_rulos *x, double f){
