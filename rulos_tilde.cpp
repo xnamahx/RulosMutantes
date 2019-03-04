@@ -37,6 +37,7 @@ struct t_rulos {
 	double f_trigger;
 	double f_level;
 	double f_note;
+	double freqext_patched;
 	double f_num_channels;
 	float 	f_sample_rate;
 
@@ -55,15 +56,23 @@ void rulos_perform64(t_rulos* self, t_object* dsp64, double** ins, long numins, 
 	int       blockSize = self->iobufsz;
     double    *out = outs[0];   // first outlet
     double    *out2 = outs[1];   // first outlet
+    double    *in = ins[0];
     if (numouts>0)
     {
 		if (!self->lpg) {
 			self->patch.timbre = self->f_timbre;
 			self->patch.morph = self->f_morph;
+			self->patch.lpg_colour = 0.5f;
+			self->patch.decay = 0.5f;
 		}
 		else {
 			self->patch.lpg_colour = self->f_timbre;
 			self->patch.decay = self->f_morph;
+		}
+
+		if(self->freqext_patched>0.5f){
+			self->f_freq_in = constrain(*in, -1.f, 1.f) * 8.f;
+			self->modulations.frequency =  self->f_freq_in * 6.f;
 		}
 
 		self->obuf = new plaits::Voice::Frame[blockSize];
@@ -96,7 +105,7 @@ void* rulos_new(void) {
 	outlet_new(self, "signal");
 	outlet_new(self, "signal");
 	inlet_new(self, NULL);
-	dsp_setup((t_pxobject*)self, 0);
+	dsp_setup((t_pxobject*)self, 1);
 
 	return (void *)self;
 }
@@ -127,9 +136,18 @@ void rulos_assist(t_rulos* self, void* unused, t_assist_function io, long index,
 	}
 }
 
-void rulos_frequency_patched(t_rulos *x, double f){
+void rulos_note_patched(t_rulos *x, double f)
+{
 	x->modulations.frequency_patched = f>0.5f;//self->f_freq;
+	if (x->freqext_patched>0.5f)
+	{
+		x->modulations.frequency_patched = x->freqext_patched>0.5f;
+	}
+}
 
+void rulos_frequency_patched(t_rulos *x, double f){
+	x->freqext_patched =  f;
+	x->modulations.frequency_patched = f>0.5f;//self->f_freq;
 }
 
 void rulos_timbre_patched(t_rulos *x, double f){
@@ -202,21 +220,19 @@ void rulos_freqcv(t_rulos *x, double f)
 
 void rulos_freqin(t_rulos *x, double f)
 {
-	x->f_freq_in = constrain(f, -1.f, 1.f) * 8.f;
-	x->modulations.frequency =  x->f_freq_in * 6.f;
+	x->f_freq_in = constrain(f, -1.f, 1.f);
+	x->modulations.frequency =  (x->f_freq_in * 6.f) - 60.f;
 }
 
 void rulos_note(t_rulos *x, double f)
 {
-	x->f_note = f + 24.f;
-	x->patch.note = x->f_note;
-	//x->f_note = constrain(f, 0.f, 8.f) / 8.f;
-	//x->patch.note = 24.f + (x->f_note * 7.f) * 12.f;
+	x->f_note = f;
+	x->modulations.note = x->f_note;
 	//x->modulations.note = 24.f + (x->f_note * 7.f) * 12.f;
 
-	object_post(&x->x_obj, "rulos_note");
+	/*object_post(&x->x_obj, "rulos_note");
 	std::string s = std::to_string(x->patch.note);
-	object_post(&x->x_obj, s.c_str());
+	object_post(&x->x_obj, s.c_str());*/
 
 	//x->modulations.note = ((x->f_note * 10.f) - 3.f) * 12.f;
 }
@@ -224,12 +240,12 @@ void rulos_note(t_rulos *x, double f)
 
 void rulos_freq(t_rulos *x, double f)
 {
-  	x->f_freq = f + 24.f;/*constrain(f, -3.f, 4.f);*/
+  	x->f_freq = f;/*constrain(f, -3.f, 4.f);*/
 	x->patch.note = x->f_freq;/*60.f + x->f_freq * 12.f;*/
 
-	object_post(&x->x_obj, "rulos_freq");
+	/*object_post(&x->x_obj, "rulos_freq");
 	std::string s = std::to_string(x->patch.note);
-	object_post(&x->x_obj, s.c_str());
+	object_post(&x->x_obj, s.c_str());*/
 }
 
 void rulos_model2(t_rulos *x, double f){
@@ -268,6 +284,7 @@ void ext_main(void* r) {
 	class_addmethod(this_class,(method) rulos_morphcv, "morphcv", A_DEFFLOAT, 0);
 	class_addmethod(this_class,(method) rulos_morphin, "morphin", A_DEFFLOAT, 0);
 	class_addmethod(this_class,(method) rulos_harmonics, "harmonics", A_DEFFLOAT, 0);
+	class_addmethod(this_class,(method) rulos_note_patched, "note_patched", A_DEFFLOAT, 0);
 	class_addmethod(this_class,(method) rulos_frequency_patched, "frequency_patched", A_DEFFLOAT, 0);
 	class_addmethod(this_class,(method) rulos_timbre_patched, "timbre_patched", A_DEFFLOAT, 0);
 	class_addmethod(this_class,(method) rulos_morph_patched, "morph_patched", A_DEFFLOAT, 0);
