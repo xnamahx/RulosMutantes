@@ -18,8 +18,9 @@ inline short TO_SHORTFRAME(float v) { return (short(v * 16384.f)); }
 inline float FROM_SHORTFRAME(short v) { return (float(v) / 16384.f); }
 
 struct t_rulos {
-	t_object  x_obj;
+	t_pxobject m_obj;
 
+	double f_init;
 	double f_model1;
 	double f_model2;
 	double f_freq;
@@ -48,72 +49,93 @@ struct t_rulos {
 	plaits::Voice::Frame* obuf;
 	int iobufsz;
 	bool lpg;
+	char shared_buffer[16 * 1024];
 };
 
-char shared_buffer[16 * 1024];
 
 void rulos_perform64(t_rulos* self, t_object* dsp64, double** ins, long numins, double** outs, long numouts, long sampleframes, long flags, void* userparam) {
-	int       blockSize = self->iobufsz;
+
     double    *out = outs[0];   // first outlet
     double    *out2 = outs[1];   // first outlet
-    double    *in = ins[0];
-    if (numouts>0)
-    {
-		if (!self->lpg) {
-			self->patch.timbre = self->f_timbre;
-			self->patch.morph = self->f_morph;
-			self->patch.lpg_colour = 0.5f;
-			self->patch.decay = 0.5f;
-		}
-		else {
-			self->patch.lpg_colour = self->f_timbre;
-			self->patch.decay = self->f_morph;
-		}
 
-		if(self->freqext_patched>0.5f){
-			self->f_freq_in = constrain(*in, -1.f, 1.f) * 8.f;
-			self->modulations.frequency =  self->f_freq_in * 6.f;
-		}
+	if (self->iobufsz!=sampleframes)
+	{
+		self->iobufsz = sampleframes;
+		self->obuf = new plaits::Voice::Frame[self->iobufsz];
+	}
 
-		self->obuf = new plaits::Voice::Frame[blockSize];
-		// Render frames
-		self->voice.Render(self->patch, self->modulations, self->obuf, blockSize);
-		
-		for (int i = 0; i < blockSize; i++) {
-			*out++ = FROM_SHORTFRAME(self->obuf[i].out);
-			*out2++ = FROM_SHORTFRAME(self->obuf[i].aux);
-		}
-    }
+	if (!self->lpg) {
+		self->patch.timbre = self->f_timbre;
+		self->patch.morph = self->f_morph;
+		self->patch.lpg_colour = 0.5f;
+		self->patch.decay = 0.5f;
+	}
+	else {
+		self->patch.lpg_colour = self->f_timbre;
+		self->patch.decay = self->f_morph;
+	}
+
+	self->obuf = new plaits::Voice::Frame[sampleframes];
+	// Render frames
+	self->voice.Render(self->patch, self->modulations, self->obuf, sampleframes);
+	
+	for (int i = 0; i < sampleframes; i++) {
+		*out++ = self->obuf[i].out / 32768.0f;
+		*out2++ =self->obuf[i].aux / 32768.0f;
+	}
 
 }
 
 void* rulos_new(void) {
 	t_rulos* self = (t_rulos*)object_alloc(this_class);
-	memset(shared_buffer, 0, sizeof(shared_buffer));
-	stmlib::BufferAllocator allocator(shared_buffer, sizeof(shared_buffer));
+
+	outlet_new(self, "signal");
+	outlet_new(self, "signal");
+
+	dsp_setup((t_pxobject*)self, 0);
+
+	stmlib::BufferAllocator allocator(self->shared_buffer, sizeof(self->shared_buffer));
 	self->voice.Init(&allocator);
-	//memset(&self->patch, 0, sizeof(self->patch));
-	//memset(&self->modulations, 0, sizeof(self->modulations));
+
 	self->iobufsz = 64;
 	self->obuf = new plaits::Voice::Frame[self->iobufsz];
 
-	self->patch.engine = 0;
+	self->patch.engine = 1;
+	self->patch.note = 48.0f;
+	self->patch.harmonics = 0.3f;
+	self->patch.timbre = 0.7f;
+	self->patch.morph = 0.7f;
+	self->patch.frequency_modulation_amount = 0.0f;
+	self->patch.timbre_modulation_amount = 0.0f;
+	self->patch.morph_modulation_amount = 0.0f;
+	self->patch.decay = 0.1f;
+	self->patch.lpg_colour = 0.0f;
+	  
+	self->modulations.note = 0.0f;
+	self->modulations.engine = 0.0f;
+	self->modulations.frequency = 0.0f;
+	self->modulations.note = 0.0f;
+	self->modulations.harmonics = 0.0f;
+	self->modulations.morph = 0.0;
+	self->modulations.level = 1.0f;
+	self->modulations.trigger = 0.0f;
+	self->modulations.frequency_patched = false;
+	self->modulations.timbre_patched = false;
+	self->modulations.morph_patched = false;
+	self->modulations.trigger_patched = true;
+	self->modulations.level_patched = false;
+
+
 	self->lpg = false;
 	self->patch.lpg_colour = 0.5f;
 	self->patch.decay = 0.5f;
-
-	outlet_new(self, "signal");
-	outlet_new(self, "signal");
-	inlet_new(self, NULL);
-	dsp_setup((t_pxobject*)self, 1);
+	self->f_init = 0;
 
 	return (void *)self;
 }
 
 
 void rulos_free(t_rulos* self) {
-	delete [] self->obuf;
-
 	dsp_free((t_pxobject*)self);
 }
 
@@ -124,6 +146,13 @@ void rulos_dsp64(t_rulos* self, t_object* dsp64, short* count, double samplerate
 
 
 void rulos_assist(t_rulos* self, void* unused, t_assist_function io, long index, char* string_dest) {
+	if (io == ASSIST_INLET) {
+		switch (index) {
+			case 0: 
+				strncpy(string_dest,"Properties", ASSIST_STRING_MAXSIZE); 
+				break;
+		}
+	}
 	if (io == ASSIST_OUTLET) {
 		switch (index) {
 			case 0: 
@@ -237,6 +266,10 @@ void rulos_note(t_rulos *x, double f)
 	//x->modulations.note = ((x->f_note * 10.f) - 3.f) * 12.f;
 }
 
+void rulos_init(t_rulos *x, double f)
+{
+	x->f_init = f;
+}
 
 void rulos_freq(t_rulos *x, double f)
 {
@@ -259,7 +292,6 @@ void rulos_lpg(t_rulos *x, double f)
 
 void rulos_level(t_rulos *x, double f)
 {
-	x->f_level = constrain(f, -1.f, 1.f);
 	x->modulations.level = x->f_level;
 }
 
@@ -290,6 +322,7 @@ void ext_main(void* r) {
 	class_addmethod(this_class,(method) rulos_morph_patched, "morph_patched", A_DEFFLOAT, 0);
 	class_addmethod(this_class,(method) rulos_trigger_patched, "trigger_patched", A_DEFFLOAT, 0);
 	class_addmethod(this_class,(method) rulos_level_patched, "level_patched", A_DEFFLOAT, 0);
+	class_addmethod(this_class,(method) rulos_init, "init", A_DEFFLOAT, 0);
 
 	/*class_addmethod(this_class,(method) rulos_freeze, "freeze", A_DEFFLOAT, 0);*/
 

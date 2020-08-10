@@ -1,8 +1,10 @@
 # RulosMutantes
+
 MI Plaits port to Max 8
-Windows x64
+
+Windows x64 / OSX
  
- ![Imgur Image](http://www.maxforlive.com/images/screenshots/?ss=rulos_screen.png&id=5292)
+ ![Imgur Image](https://i.imgur.com/Of6X1Oy.png)
  
  Manual
  

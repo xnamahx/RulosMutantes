@@ -108,6 +108,8 @@ inline float SoftClip(float x) {
   }
 }
 
+#define TEST
+
 #ifdef TEST
   inline int32_t Clip16(int32_t x) {
     if (x < -32768) {
@@ -139,6 +141,7 @@ inline float SoftClip(float x) {
     return result;
   }
 #endif
+
   
 #ifdef TEST
   inline float Sqrt(float x) {

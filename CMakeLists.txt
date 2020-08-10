@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0)
 
 
-include(${CMAKE_CURRENT_SOURCE_DIR}/../../max-api/script/max-pretarget.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../../min-api/script/min-pretarget.cmake)
 
 include_directories( 
 	"${C74_INCLUDES}"
@@ -48,12 +48,12 @@ set(MI_COMMON_SRC
        mi/stmlib/utils/random.cc
 )
 
-set(MILIB_SRC 
+set(MIRULOLIB_SRC 
         ${MI_COMMON_SRC}
         ${PLAITS_SRC}
         )
 
-add_library(MIPlaitsLib ${MILIB_SRC} )
+add_library(MIPlaitsLib ${MIRULOLIB_SRC} )
 
 add_library( 
 	${PROJECT_NAME} 
@@ -63,4 +63,4 @@ add_library(
 
 target_link_libraries(${PROJECT_NAME} MIPlaitsLib)
 
-include(${CMAKE_CURRENT_SOURCE_DIR}/../../max-api/script/max-posttarget.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../../min-api/script/min-posttarget.cmake)
